@@ -613,6 +613,18 @@
                         <button onclick="resetModelContext()" style="width:100%; margin-bottom:10px;">🔄 Reset Context</button>
                     </div>
                     
+                    <div class="system-prompt-section" style="margin-bottom: 20px;">
+                        <h3>System Prompt</h3>
+                        <textarea id="systemPrompt" placeholder="Enter system prompt to guide AI behavior..." style="width:100%; height:80px; padding:10px; border:2px solid #000; border-radius:8px; font-family:monospace; font-size:12px; resize:vertical;"></textarea>
+                        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                            <button onclick="setSystemPrompt('You are a helpful AI assistant.')" style="font-size:11px; padding:4px 8px;">🤖 Helpful</button>
+                            <button onclick="setSystemPrompt('You are a creative AI that thinks outside the box.')" style="font-size:11px; padding:4px 8px;">🎨 Creative</button>
+                            <button onclick="setSystemPrompt('You are a coding expert. Provide clean, efficient code solutions.')" style="font-size:11px; padding:4px 8px;">💻 Coder</button>
+                            <button onclick="setSystemPrompt('You are a teacher. Explain concepts clearly and simply.')" style="font-size:11px; padding:4px 8px;">📚 Teacher</button>
+                            <button onclick="clearSystemPrompt()" style="font-size:11px; padding:4px 8px;">🗑️ Clear</button>
+                        </div>
+                    </div>
+                    
                     <div class="generation-settings">
                         <h3>Generation Settings</h3>
                         <div class="param-row">
@@ -1194,6 +1206,30 @@
             status.style.display = 'block';
         }
         
+        // System prompt functions
+        function setSystemPrompt(prompt) {
+            document.getElementById('systemPrompt').value = prompt;
+            localStorage.setItem('systemPrompt', prompt);
+            showStatus('System prompt updated', 'loaded');
+        }
+        
+        function clearSystemPrompt() {
+            document.getElementById('systemPrompt').value = '';
+            localStorage.removeItem('systemPrompt');
+            showStatus('System prompt cleared', 'loaded');
+        }
+        
+        function loadSystemPrompt() {
+            const savedPrompt = localStorage.getItem('systemPrompt');
+            if (savedPrompt) {
+                document.getElementById('systemPrompt').value = savedPrompt;
+            }
+        }
+        
+        function getSystemPrompt() {
+            return document.getElementById('systemPrompt').value.trim();
+        }
+        
         async function resetModelContext() {
             try {
                 showStatus('Resetting model context...', 'loading');
@@ -1252,15 +1288,23 @@
             scrollToBottom();
             
             try {
+                const systemPrompt = getSystemPrompt();
+                const requestPayload = {
+                    messages: messages,
+                    max_tokens: parseInt(document.getElementById('maxTokens').value),
+                    temperature: parseFloat(document.getElementById('temperature').value),
+                    top_p: parseFloat(document.getElementById('topP').value)
+                };
+                
+                // Add system prompt if provided
+                if (systemPrompt) {
+                    requestPayload.system_prompt = systemPrompt;
+                }
+                
                 const response = await fetch('/api/chat/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        messages: messages,
-                        max_tokens: parseInt(document.getElementById('maxTokens').value),
-                        temperature: parseFloat(document.getElementById('temperature').value),
-                        top_p: parseFloat(document.getElementById('topP').value)
-                    })
+                    body: JSON.stringify(requestPayload)
                 });
                 
                 const reader = response.body.getReader();
@@ -1506,6 +1550,7 @@ Generate only the HTML code (no explanations):`;
         document.addEventListener('DOMContentLoaded', function() {
             checkStatus();
             loadDownloadPath();
+            loadSystemPrompt();
         });
     </script>
 </body>

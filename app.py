@@ -593,12 +593,15 @@ def chat():
     max_tokens = data.get('max_tokens', 512)
     temperature = data.get('temperature', 0.7)
     top_p = data.get('top_p', 0.9)
+    system_prompt = data.get('system_prompt')
     
     if not messages:
         return jsonify({'error': 'Messages are required'}), 400
     
-    # Add system prompt if not present
-    if not any(m.get('role') == 'system' for m in messages):
+    # Add system prompt if provided or default if not present
+    if system_prompt:
+        messages.insert(0, {'role': 'system', 'content': system_prompt})
+    elif not any(m.get('role') == 'system' for m in messages):
         messages.insert(0, {'role': 'system', 'content': SYSTEM_PROMPT})
     
     prompt = format_prompt(messages)
@@ -629,12 +632,15 @@ def chat_stream():
     max_tokens = data.get('max_tokens', 512)
     temperature = data.get('temperature', 0.7)
     top_p = data.get('top_p', 0.9)
+    system_prompt = data.get('system_prompt')
     
     if not messages:
         return jsonify({'error': 'Messages are required'}), 400
     
-    # Add system prompt if not present
-    if not any(m.get('role') == 'system' for m in messages):
+    # Add system prompt if provided or default if not present
+    if system_prompt:
+        messages.insert(0, {'role': 'system', 'content': system_prompt})
+    elif not any(m.get('role') == 'system' for m in messages):
         messages.insert(0, {'role': 'system', 'content': SYSTEM_PROMPT})
     
     prompt = format_prompt(messages)
