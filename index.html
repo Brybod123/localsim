@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local GGUF Chat</title>
+    <style>
+        * {
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #000;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+        }
+        
+        .app-container {
+            width: 100%;
+            max-width: 1400px;
+            height: 90vh;
+            max-height: 900px;
+            background: #fff;
+            border: 8px solid #000;
+            border-radius: 0;
+            display: flex;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .sidebar {
+            width: 350px;
+            background: #fff;
+            border-right: 4px solid #000;
+            padding: 30px;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        
+        .sidebar h2 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 3px solid #000;
+            padding-bottom: 10px;
+        }
+        
+        .sidebar h3 {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            margin-top: 25px;
+        }
+        
+        .model-section, .params-section {
+            margin-bottom: 30px;
+        }
+        
+        .model-section label, .params-section label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .model-section input, .params-section input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 3px solid #000;
+            background: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 12px;
+        }
+        
+        .model-section input:focus, .params-section input:focus {
+            outline: none;
+            background: #f5f5f5;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        
+        .model-section button, .params-section button {
+            width: 100%;
+            padding: 12px 20px;
+            background: #000;
+            color: #fff;
+            border: 3px solid #000;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .model-section button:hover, .params-section button:hover {
+            background: #fff;
+            color: #000;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        
+        .model-section button:disabled {
+            background: #ccc;
+            color: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .expandable-search {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        
+        .expandable-search.expanded {
+            margin-bottom: 20px;
+        }
+        
+        .expandable-search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 3px solid #000;
+            background: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 12px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .expandable-search-input:focus {
+            outline: none;
+            background: #f5f5f5;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        
+        .search-results {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 3px solid transparent;
+            border-radius: 12px;
+            margin-top: 10px;
+        }
+        
+        .search-results.expanded {
+            max-height: 300px;
+            overflow-y: auto;
+            border-color: #000;
+            background: #fff;
+        }
+        
+        .search-result-item {
+            padding: 12px 16px;
+            border-bottom: 2px solid #f5f5f5;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .search-result-item:hover {
+            background: #f5f5f5;
+            padding-left: 20px;
+        }
+        
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .param-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .param-row > div {
+            flex: 1;
+        }
+        
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+        }
+        
+        .chat-header {
+            padding: 30px;
+            border-bottom: 4px solid #000;
+            background: #fff;
+        }
+        
+        .chat-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .chat-container {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background: #fff;
+        }
+        
+        .message {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 3px solid #000;
+            background: #fff;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .message.user {
+            background: #000;
+            color: #fff;
+            border-color: #000;
+        }
+        
+        .message.assistant {
+            background: #fff;
+            color: #000;
+            border-color: #000;
+        }
+        
+        .message.system {
+            background: #f5f5f5;
+            color: #000;
+            border-color: #ccc;
+            font-style: italic;
+        }
+        
+        .chat-input {
+            padding: 30px;
+            border-top: 4px solid #000;
+            background: #fff;
+        }
+        
+        .chat-input input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 3px solid #000;
+            background: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 15px;
+            transition: all 0.2s ease;
+        }
+        
+        .chat-input input[type="text"]:focus {
+            outline: none;
+            background: #f5f5f5;
+        }
+        
+        .chat-input .input-row {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .chat-input .input-row input {
+            flex: 1;
+        }
+        
+        .chat-input .input-row button {
+            padding: 15px 30px;
+            background: #000;
+            color: #fff;
+            border: 3px solid #000;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .chat-input .input-row button:hover:not(:disabled) {
+            background: #fff;
+            color: #000;
+        }
+        
+        .chat-input .input-row button:disabled {
+            background: #ccc;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        .mode-switch {
+            display: flex;
+            background: #f5f5f5;
+            border: 3px solid #000;
+            border-radius: 0;
+            padding: 2px;
+            margin-bottom: 15px;
+        }
+        
+        .mode-switch button {
+            flex: 1;
+            padding: 10px;
+            background: transparent;
+            color: #000;
+            border: none;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .mode-switch button.active {
+            background: #000;
+            color: #fff;
+        }
+        
+        .mode-indicator {
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .status {
+            padding: 10px 15px;
+            border: 2px solid #000;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            border-color: #000;
+        }
+        
+        .status.loaded {
+            background: #d4edda;
+            color: #155724;
+            border-color: #000;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #000;
+        }
+        
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 3px solid #000;
+            background: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        
+        /* Website preview styles */
+        .website-preview {
+            border: 3px solid #000;
+            border-radius: 0;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+        
+        .website-preview iframe {
+            border: none;
+            display: block;
+        }
+        
+        .website-preview details {
+            border-top: 3px solid #000;
+        }
+        
+        .website-preview summary {
+            padding: 12px;
+            background: #f5f5f5;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            border: none;
+            outline: none;
+        }
+        
+        .website-preview pre {
+            margin: 0;
+            padding: 15px;
+            background: #f5f5f5;
+            font-size: 11px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        
+        /* Loading indicator */
+        .loading-indicator {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            padding: 15px;
+            justify-content: center;
+        }
+        
+        .loading-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #000;
+            border-radius: 50%;
+            animation: bounce 1.4s ease-in-out infinite both;
+        }
+        
+        .loading-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .loading-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        
+        /* Welcome Screen */
+        .welcome-screen {
+            position: relative;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .radial-gradient {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 40%, rgba(198, 119, 255, 0.3) 0%, transparent 50%),
+                        radial-gradient(circle at 60% 60%, rgba(119, 198, 255, 0.3) 0%, transparent 50%),
+                        radial-gradient(circle at 85% 85%, rgba(255, 198, 119, 0.3) 0%, transparent 50%);
+            background-size: 200% 200%;
+            animation: floatGradients 20s ease-in-out infinite;
+            border-radius: 12px;
+        }
+        
+        .welcome-content {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #000;
+            border-radius: 12px;
+            max-width: 800px;
+            backdrop-filter: blur(5px);
+        }
+        
+        .welcome-content h1 {
+            color: #000;
+            font-size: 2.5em;
+            font-weight: 100;
+            margin-bottom: 20px;
+            text-shadow: none;
+            letter-spacing: 2px;
+        }
+        
+        .welcome-content p {
+            color: #000;
+            font-size: 1.1em;
+            line-height: 1.6;
+            margin: 0;
+            font-weight: 200;
+            letter-spacing: 1px;
+        }
+        
+        @keyframes floatGradients {
+            0%, 100% {
+                background-position: 0% 0%, 100% 100%, 50% 50%, 80% 20%, 60% 60%;
+            }
+            25% {
+                background-position: 100% 100%, 0% 0%, 80% 20%, 60% 60%, 85% 85%;
+            }
+            50% {
+                background-position: 50% 50%, 100% 100%, 40% 40%, 80% 20%, 20% 80%;
+            }
+            75% {
+                background-position: 0% 0%, 50% 50%, 60% 60%, 40% 40%, 100% 100%;
+            }
+        }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 10px;
+            }
+            
+            .app-container {
+                flex-direction: column;
+                height: auto;
+                max-height: none;
+            }
+            
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 4px solid #000;
+                max-height: 300px;
+            }
+            
+            .param-row {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <h2>Model Settings</h2>
+            
+            <div class="model-section">
+                <label>Model Path (.gguf file)</label>
+                <input type="text" id="modelPath" placeholder="/path/to/model.gguf" onkeydown="handleModelPathKeydown(event)">
+                <button onclick="loadModel()" id="loadBtn">Load Model</button>
+                
+                <div class="expandable-search" id="huggingfaceSearch" style="margin-top: 15px;">
+                    <input type="text" id="searchInput" class="expandable-search-input" placeholder="🔍 Search HuggingFace models..." onkeydown="handleSearchKeydown(event)" onchange="autoSearch()">
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <div style="flex: 1;">
+                            <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #000;">Max Parameters</label>
+                            <select id="maxParams" style="width: 100%; padding: 8px; border: 2px solid #000; background: #fff; font-size: 12px; border-radius: 8px;" onchange="autoSearch()">
+                                <option value="8">8B</option>
+                                <option value="14">14B</option>
+                                <option value="32">32B</option>
+                                <option value="70">70B</option>
+                                <option value="">No Limit</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #000;">Model Family</label>
+                            <select id="modelFamily" style="width: 100%; padding: 8px; border: 2px solid #000; background: #fff; font-size: 12px; border-radius: 8px;" onchange="autoSearch()">
+                                <option value="">All Families</option>
+                                <option value="LFM2.5">LFM2.5</option>
+                                <option value="LFM2">LFM2</option>
+                                <option value="Qwen3">Qwen3</option>
+                                <option value="Qwen2.5">Qwen2.5</option>
+                                <option value="Deepseek R1">Deepseek R1</option>
+                                <option value="Llama">Llama</option>
+                                <option value="Mistral">Mistral</option>
+                                <option value="Phi">Phi</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #000;">Quantization</label>
+                            <select id="quantization" style="width: 100%; padding: 8px; border: 2px solid #000; background: #fff; font-size: 12px; border-radius: 8px;" onchange="autoSearch()">
+                                <option value="">Any</option>
+                                <option value="Q4_K_M">Q4_K_M</option>
+                                <option value="Q5_K_M">Q5_K_M</option>
+                                <option value="Q8_0">Q8_0</option>
+                                <option value="Q2_K">Q2_K</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="searchResults" class="search-results"></div>
+                </div>
+                
+                <div class="expandable-search" id="customPathSearch" style="margin-top: 15px;">
+                    <input type="text" id="downloadPath" class="expandable-search-input" placeholder="📁 Custom download path..." onkeydown="handlePathKeydown(event)">
+                    <div id="pathResults" class="search-results"></div>
+                </div>
+                
+                <button onclick="scanModels()" style="width:100%; margin-top:10px;">📁 Scan for Models</button>
+                
+                <button onclick="toggleSettings()" style="margin-top:10px;">⚙️ Settings</button>
+                
+                <div id="settingsPanel" style="display:none; margin-top:15px; padding-top:15px; border-top: 2px solid #000;">
+                    <div style="margin-bottom: 15px;">
+                        <button onclick="resetModelContext()" style="width:100%; margin-bottom:10px;">🔄 Reset Context</button>
+                    </div>
+                    
+                    <div class="generation-settings">
+                        <h3>Generation Settings</h3>
+                        <div class="param-row">
+                            <div>
+                                <label for="maxTokens">Max Tokens</label>
+                                <input type="number" id="maxTokens" value="512" min="1" max="4096">
+                            </div>
+                            <div>
+                                <label for="temperature">Temperature</label>
+                                <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1">
+                            </div>
+                            <div>
+                                <label for="topP">Top P</label>
+                                <input type="number" id="topP" value="0.9" min="0" max="1" step="0.1">
+                            </div>
+                        </div>
+                        <div>
+                            <label>Context Size</label>
+                            <input type="number" id="nCtx" value="4096" min="512" max="32768" step="512">
+                        </div>
+                    </div>
+                </div>
+                
+                <select id="modelSelect" style="margin-top:10px; display:none;" onchange="selectModel()"></select>
+                <div id="modelStatus" class="status" style="display:none"></div>
+            </div>
+        </div>
+        
+        <div class="main">
+            <div class="chat-header">
+                <h1>Local GGUF Chat</h1>
+                <div class="subtitle" id="statusText">No model loaded</div>
+            </div>
+            
+            <div class="chat-container" id="chatContainer">
+                <div class="welcome-screen" id="welcomeScreen">
+                    <div class="radial-gradient"></div>
+                    <div class="welcome-content">
+                        <h1>Welcome LFM2.5</h1>
+                        <p>LiquidAI's newest set of models supports vision, thinking, and just fast conversation at a really small size</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chat-input">
+                <div class="mode-switch">
+                    <button id="chatMode" class="active" onclick="setMode('chat')">Chat</button>
+                    <button id="websiteMode" onclick="setMode('website')">Website</button>
+                </div>
+                <div class="mode-indicator" id="modeIndicator">AI Chat Mode</div>
+                <input type="text" id="messageInput" placeholder="Type your message..." onkeydown="handleKeyDown(event)">
+                <div class="input-row">
+                    <button id="sendBtn" onclick="sendMessage()" disabled>Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let messages = [];
+        let currentMode = 'chat'; // 'chat' or 'website'
+        let isGenerating = false;
+        
+        function toggleSettings() {
+            const panel = document.getElementById('settingsPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        function handleModelPathKeydown(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                loadModel();
+            }
+        }
+        
+        function handleSearchKeydown(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                performSearch();
+            } else if (event.key === 'Escape') {
+                collapseSearch();
+            }
+        }
+        
+        function handlePathKeydown(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                saveDownloadPath();
+            } else if (event.key === 'Escape') {
+                collapsePathSearch();
+            }
+        }
+        
+        function autoSearch() {
+            // Auto-search when filters change or on page load
+            performSearch();
+        }
+        
+        function performSearch(offset = 0) {
+            const query = document.getElementById('searchInput').value.trim();
+            const maxParams = document.getElementById('maxParams').value;
+            const quantization = document.getElementById('quantization').value;
+            const modelFamily = document.getElementById('modelFamily').value;
+            const resultsDiv = document.getElementById('searchResults');
+            const searchContainer = document.getElementById('huggingfaceSearch');
+            
+            // Use "trending" as default search term if no query
+            const searchTerm = query || 'trending';
+            
+            // Expand search container
+            searchContainer.classList.add('expanded');
+            resultsDiv.classList.add('expanded');
+            resultsDiv.innerHTML = '<div style="color:#000; font-size:0.8em; padding:12px;">🔍 Searching...</div>';
+            
+            // Build search URL with filters and offset
+            let searchUrl = `/api/models/search?search=${encodeURIComponent(searchTerm)}&limit=10`;
+            if (maxParams) searchUrl += `&max_params=${maxParams}`;
+            if (quantization) searchUrl += `&quantization=${quantization}`;
+            if (modelFamily) searchUrl += `&family=${encodeURIComponent(modelFamily)}`;
+            if (offset > 0) searchUrl += `&offset=${offset}`;
+            
+            fetch(searchUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.models && data.models.length > 0) {
+                        const currentOffset = offset + data.models.length;
+                        resultsDiv.innerHTML = data.models.map(m => `
+                            <div class="search-result-item" onclick="selectHuggingFaceModel('${m.id}')">
+                                <div style="font-weight:600; color:#000; font-size:0.85em;">${m.id}</div>
+                                <div style="color:#666; font-size:0.75em;">${m.author} • ${m.downloads.toLocaleString()} downloads</div>
+                                <div style="color:#000; font-size:0.75em; font-weight:500;">${m.param_size}B params • ~${m.ram_usage} RAM • ${m.file_size} file</div>
+                                <button onclick="event.stopPropagation(); downloadModel('${m.id}')" 
+                                        style="margin-top:5px; padding:4px 8px; background:#000; color:white; border:2px solid #000; border-radius:6px; font-size:0.7em; cursor:pointer;">
+                                    Download
+                                </button>
+                            </div>
+                        `).join('');
+                        
+                        // Add "Load More" button if we got 10 models
+                        if (data.models.length === 10) {
+                            resultsDiv.innerHTML += `
+                                <div class="load-more-container" style="text-align: center; margin-top: 15px;">
+                                    <button onclick="performSearch(${currentOffset})" 
+                                            style="padding:8px 16px; background:#000; color:white; border:2px solid #000; border-radius:8px; font-size:0.8em; cursor:pointer;">
+                                        Load More Models
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        resultsDiv.innerHTML = '<div style="color:#000; font-size:0.8em; padding:12px;">No models found with current filters</div>';
+                    }
+                })
+                .catch(err => {
+                    resultsDiv.innerHTML = '<div style="color:#000; font-size:0.8em; padding:12px;">Search error: ' + err.message + '</div>';
+                });
+        }
+        
+        function collapseSearch() {
+            const resultsDiv = document.getElementById('searchResults');
+            const searchContainer = document.getElementById('huggingfaceSearch');
+            resultsDiv.classList.remove('expanded');
+            searchContainer.classList.remove('expanded');
+            setTimeout(() => {
+                resultsDiv.innerHTML = '';
+            }, 300);
+        }
+        
+        function collapsePathSearch() {
+            const resultsDiv = document.getElementById('pathResults');
+            const pathContainer = document.getElementById('customPathSearch');
+            resultsDiv.classList.remove('expanded');
+            pathContainer.classList.remove('expanded');
+            setTimeout(() => {
+                resultsDiv.innerHTML = '';
+            }, 300);
+        }
+        
+        function selectHuggingFaceModel(modelId) {
+            document.getElementById('modelPath').value = modelId;
+            collapseSearch();
+            showStatus(`Selected: ${modelId}`, 'loaded');
+        }
+        
+        function setMode(mode) {
+            currentMode = mode;
+            const chatBtn = document.getElementById('chatMode');
+            const websiteBtn = document.getElementById('websiteMode');
+            const indicator = document.getElementById('modeIndicator');
+            const input = document.getElementById('messageInput');
+            
+            if (mode === 'chat') {
+                chatBtn.classList.add('active');
+                websiteBtn.classList.remove('active');
+                indicator.textContent = 'AI Chat Mode';
+                input.placeholder = 'Type your message...';
+            } else {
+                chatBtn.classList.remove('active');
+                websiteBtn.classList.add('active');
+                indicator.textContent = 'Website Generator Mode';
+                input.placeholder = 'Describe the website you want to create...';
+            }
+        }
+        
+        async function loadModel() {
+            const path = document.getElementById('modelPath').value.trim();
+            if (!path) {
+                showStatus('Please enter a model path', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('loadBtn');
+            const nCtx = parseInt(document.getElementById('nCtx').value);
+            btn.disabled = true;
+            
+            // Check if path is a HuggingFace model ID and needs downloading
+            if (path.includes('/')) {
+                // It's a local path, try to load directly
+                try {
+                    const response = await fetch('/api/models', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ path, n_ctx: nCtx })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        showStatus('Model loaded successfully!', 'loaded');
+                        document.getElementById('statusText').textContent = `Loaded: ${path.split('/').pop()}`;
+                        document.getElementById('sendBtn').disabled = false;
+                        addMessage('system', 'Model loaded! You can now start chatting.');
+                    } else {
+                        showStatus(data.error || 'Failed to load model', 'error');
+                    }
+                } catch (err) {
+                    showStatus('Error: ' + err.message, 'error');
+                } finally {
+                    btn.disabled = false;
+                }
+            } else {
+                // It's a HuggingFace model ID, download first
+                downloadModel(path);
+            }
+        }
+        
+        async function scanModels() {
+            const customPath = getDownloadPath();
+            if (!customPath) {
+                showStatus('Please set a custom path first', 'error');
+                return;
+            }
+            
+            try {
+                showStatus(`Scanning ${customPath}...`, 'loading');
+                const response = await fetch('/api/models/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: customPath })
+                });
+                
+                const data = await response.json();
+                
+                const select = document.getElementById('modelSelect');
+                if (data.models.length > 0) {
+                    select.innerHTML = '<option value="">Select a model...</option>' +
+                        data.models.map(m => `<option value="${m.path}">${m.name} (${formatSize(m.size)})</option>`).join('');
+                    select.style.display = 'block';
+                    showStatus(`Found ${data.models.length} models in ${data.scanned_path}`, 'loaded');
+                } else {
+                    select.style.display = 'none';
+                    showStatus(`No models found in ${data.scanned_path}`, 'error');
+                }
+            } catch (err) {
+                showStatus('Error scanning path: ' + err.message, 'error');
+            }
+        }
+        
+        function selectModel() {
+            const select = document.getElementById('modelSelect');
+            document.getElementById('modelPath').value = select.value;
+        }
+        
+        function toggleSearch() {
+            const searchInput = document.getElementById('searchInput');
+            searchInput.focus();
+            searchInput.select();
+        }
+        
+        async function searchModels() {
+            autoSearch();
+        }
+        
+        // Initialize search with trending models on page load
+        window.addEventListener('load', function() {
+            setTimeout(autoSearch, 500); // Small delay to ensure DOM is ready
+        });
+        
+        function selectHuggingFaceModel(modelId) {
+            document.getElementById('modelPath').value = modelId;
+            collapseSearch();
+            showStatus(`Selected: ${modelId}`, 'loaded');
+        }
+        
+        async function downloadModel(modelId) {
+            try {
+                const downloadPath = getDownloadPath();
+                const response = await fetch('/api/models/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        model_id: modelId,
+                        download_path: downloadPath
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus(data.message, 'loading');
+                    monitorDownload();
+                } else {
+                    showStatus(data.error || 'Download failed', 'error');
+                }
+            } catch (err) {
+                showStatus('Download error: ' + err.message, 'error');
+            }
+        }
+        
+        async function monitorDownload() {
+            const checkProgress = async () => {
+                try {
+                    const response = await fetch('/api/models/download/status');
+                    const status = await response.json();
+                    
+                    // Update progress display for the downloading model
+                    const progressDiv = document.getElementById(`progress-${status.model_id.replace(/[^a-zA-Z0-9]/g, '_')}`);
+                    const downloadBtn = document.getElementById(`download-${status.model_id.replace(/[^a-zA-Z0-9]/g, '_')}`);
+                    
+                    if (status.downloading) {
+                        showStatus(`Downloading ${status.model_id}... ${status.progress}%`, 'loading');
+                        
+                        if (progressDiv) {
+                            progressDiv.style.display = 'block';
+                            progressDiv.textContent = `Progress: ${status.progress}%`;
+                        }
+                        
+                        if (downloadBtn) {
+                            downloadBtn.textContent = 'Downloading...';
+                            downloadBtn.disabled = true;
+                            downloadBtn.style.background = '#533483';
+                        }
+                        
+                        if (status.progress < 100) {
+                            setTimeout(checkProgress, 1000); // Check again in 1 second
+                        } else {
+                            // Download complete, scan for new models
+                            setTimeout(() => {
+                                showStatus('Download complete! Scanning for models...', 'loaded');
+                                if (progressDiv) progressDiv.style.display = 'none';
+                                if (downloadBtn) {
+                                    downloadBtn.textContent = 'Downloaded ✓';
+                                    downloadBtn.style.background = '#2ecc71';
+                                }
+                                scanModels();
+                            }, 1000);
+                        }
+                    } else if (status.error) {
+                        showStatus('Download failed: ' + status.error, 'error');
+                        if (progressDiv) progressDiv.style.display = 'none';
+                        if (downloadBtn) {
+                            downloadBtn.textContent = 'Download';
+                            downloadBtn.disabled = false;
+                            downloadBtn.style.background = '#e94560';
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error checking download status:', err);
+                }
+            };
+            
+            checkProgress();
+        }
+        
+        // Download path management
+        function loadDownloadPath() {
+            const savedPath = localStorage.getItem('downloadPath');
+            if (savedPath) {
+                document.getElementById('downloadPath').value = savedPath;
+            }
+        }
+        
+        async function chooseDownloadPath() {
+            try {
+                const response = await fetch('/api/models/browse', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Show high storage alert if available
+                    if (data.high_storage_alert) {
+                        showHighStorageAlert(data.high_storage_alert);
+                    }
+                    
+                    // Show suggestions with external drives and security warning
+                    showSuggestions(data.suggestions, data.external_drives || [], data.message, data.security_warning || '');
+                } else {
+                    showStatus(data.error || 'Failed to get directory suggestions', 'error');
+                }
+            } catch (err) {
+                showStatus('Browse error: ' + err.message, 'error');
+            }
+        }
+        
+        function showHighStorageAlert(alert) {
+            // Create alert notification
+            const alertHtml = `
+                <div style="position: fixed; top: 20px; right: 20px; background: #2ecc71; color: white; 
+                           padding: 15px 20px; border-radius: 8px; z-index: 1001; max-width: 400px;
+                           box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideIn 0.3s ease-out;">
+                    <div style="font-weight: bold; margin-bottom: 5px;">💾 High Storage Available!</div>
+                    <div style="font-size: 0.9em;">${alert.message}</div>
+                    <button onclick="this.parentElement.remove()" 
+                           style="background: rgba(255,255,255,0.2); border: none; 
+                                  padding: 5px 10px; border-radius: 4px; color: white; 
+                                  cursor: pointer; margin-top: 10px;">
+                        Dismiss
+                    </button>
+                </div>
+                <style>
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                </style>
+            `;
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.innerHTML = alertHtml;
+            document.body.appendChild(alertDiv);
+            
+            // Auto-dismiss after 10 seconds
+            setTimeout(() => {
+                if (alertDiv.firstChild) alertDiv.firstChild.remove();
+            }, 10000);
+        }
+        
+        function showSuggestions(suggestions, externalDrives = [], message, securityWarning = '') {
+            // Create a simple suggestion dialog
+            const allSuggestions = [
+                ...suggestions.map(path => ({
+                    path: path,
+                    name: path,
+                    is_external: false
+                })),
+                ...externalDrives
+            ];
+            
+            const suggestionsHtml = `
+                <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                           background: #16213e; border: 2px solid #e94560; padding: 20px; 
+                           border-radius: 8px; z-index: 1000; max-width: 500px; max-height: 80vh; overflow-y: auto;">
+                    <h3 style="color: #e94560; margin-top: 0;">Choose Directory</h3>
+                    <p style="color: #a0a0a0; margin-bottom: 15px;">${message}</p>
+                    ${securityWarning ? `<div style="background: #e94560; color: white; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 0.85em;">${securityWarning}</div>` : ''}
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        ${allSuggestions.map(item => `
+                            <button onclick="selectSuggestion('${item.path}')" 
+                                   style="background: ${item.is_external ? '#2ecc71' : '#0f3460'}; 
+                                          color: white; border: 1px solid ${item.is_external ? '#27ae60' : '#533483'}; 
+                                          padding: 10px; border-radius: 4px; cursor: pointer; text-align: left;
+                                          font-size: 0.9em;">
+                                ${item.name}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #533483;">
+                        <p style="color: #a0a0a0; font-size: 0.85em; margin-bottom: 10px;">💡 Or enter any custom path:</p>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="text" id="customPathInput" placeholder="/path/to/any/directory" 
+                                   style="flex: 1; background: #0f3460; color: white; border: 1px solid #533483; 
+                                          padding: 8px; border-radius: 4px;">
+                            <button onclick="useCustomPath()" 
+                                   style="background: #e94560; color: white; border: none; 
+                                          padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                                Use
+                            </button>
+                        </div>
+                    </div>
+                    <button onclick="closeSuggestions()" 
+                           style="background: #e94560; color: white; border: none; 
+                                  padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-top: 15px;">
+                        Cancel
+                    </button>
+                </div>
+                <div id="suggestionsOverlay" onclick="closeSuggestions()" 
+                     style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                            background: rgba(0,0,0,0.5); z-index: 999;"></div>
+            `;
+            
+            const suggestionsDiv = document.createElement('div');
+            suggestionsDiv.id = 'suggestionsDialog';
+            suggestionsDiv.innerHTML = suggestionsHtml;
+            document.body.appendChild(suggestionsDiv);
+            
+            // Focus on custom path input
+            setTimeout(() => {
+                const input = document.getElementById('customPathInput');
+                if (input) input.focus();
+            }, 100);
+        }
+        
+        function selectSuggestion(path) {
+            document.getElementById('downloadPath').value = path;
+            closeSuggestions();
+            showStatus('Path selected: ' + path, 'loaded');
+        }
+        
+        function useCustomPath() {
+            const customPath = document.getElementById('customPathInput').value.trim();
+            if (customPath) {
+                document.getElementById('downloadPath').value = customPath;
+                closeSuggestions();
+                showStatus('Custom path selected: ' + customPath + ' (⚠️ verify this is safe)', 'loaded');
+            } else {
+                showStatus('Please enter a valid path', 'error');
+            }
+        }
+        
+        function closeSuggestions() {
+            const dialog = document.getElementById('suggestionsDialog');
+            if (dialog) dialog.remove();
+        }
+        
+        function saveDownloadPath() {
+            const path = document.getElementById('downloadPath').value.trim();
+            if (path) {
+                localStorage.setItem('downloadPath', path);
+                showStatus('Download path saved', 'loaded');
+                
+                // Show path suggestions
+                const pathResults = document.getElementById('pathResults');
+                const pathContainer = document.getElementById('customPathSearch');
+                pathContainer.classList.add('expanded');
+                pathResults.classList.add('expanded');
+                
+                pathResults.innerHTML = `
+                    <div class="search-result-item" style="background: #f5f5f5;">
+                        <div style="color: #000; font-weight: 600;">✓ Path saved successfully</div>
+                        <div style="color: #666; font-size: 0.8em;">${path}</div>
+                    </div>
+                `;
+                
+                setTimeout(() => {
+                    collapsePathSearch();
+                }, 2000);
+            } else {
+                showStatus('Please enter a valid path', 'error');
+            }
+        }
+        
+        function getDownloadPath() {
+            const customPath = document.getElementById('downloadPath').value.trim();
+            return customPath || '~/models';
+        }
+        
+        function formatSize(bytes) {
+            const gb = bytes / (1024 ** 3);
+            return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(bytes / (1024 ** 2)).toFixed(0)} MB`;
+        }
+        
+        function showStatus(text, type) {
+            const status = document.getElementById('modelStatus');
+            status.textContent = text;
+            status.className = 'status ' + type;
+            status.style.display = 'block';
+        }
+        
+        async function resetModelContext() {
+            try {
+                showStatus('Resetting model context...', 'loading');
+                const response = await fetch('/api/models/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus(data.message, 'loaded');
+                } else {
+                    showStatus(data.error || 'Failed to reset context', 'error');
+                }
+            } catch (err) {
+                showStatus('Reset error: ' + err.message, 'error');
+            }
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text || isGenerating) return;
+            
+            input.value = '';
+            
+            // Hide welcome screen if it exists
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            if (welcomeScreen) {
+                welcomeScreen.style.display = 'none';
+            }
+            
+            if (currentMode === 'chat') {
+                // Chat mode
+                addMessage('user', text);
+                messages.push({ role: 'user', content: text });
+                await generateChatResponse();
+            } else {
+                // Website mode
+                addMessage('user', text);
+                await generateWebsiteResponse(text);
+            }
+        }
+        
+        async function generateChatResponse() {
+            isGenerating = true;
+            document.getElementById('sendBtn').disabled = true;
+            
+            // Create assistant message for streaming
+            const assistantDiv = document.createElement('div');
+            assistantDiv.className = 'message assistant';
+            assistantDiv.textContent = '';
+            assistantDiv.id = 'currentAssistantMessage';
+            document.getElementById('chatContainer').appendChild(assistantDiv);
+            scrollToBottom();
+            
+            try {
+                const response = await fetch('/api/chat/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: messages,
+                        max_tokens: parseInt(document.getElementById('maxTokens').value),
+                        temperature: parseFloat(document.getElementById('temperature').value),
+                        top_p: parseFloat(document.getElementById('topP').value)
+                    })
+                });
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') {
+                                // Stream finished
+                                const finalText = assistantDiv.textContent;
+                                messages.push({ role: 'assistant', content: finalText });
+                                break;
+                            } else if (data.startsWith('[ERROR]')) {
+                                assistantDiv.textContent = 'Error: ' + data.slice(7);
+                                // Auto-reset context on error
+                                resetModelContext();
+                                break;
+                            } else {
+                                // Append streaming text
+                                assistantDiv.textContent += data;
+                                scrollToBottom();
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                const assistantDiv = document.getElementById('currentAssistantMessage');
+                if (assistantDiv) assistantDiv.textContent = 'Error: ' + err.message;
+            } finally {
+                // Remove the ID since streaming is done
+                const assistantDiv = document.getElementById('currentAssistantMessage');
+                if (assistantDiv) assistantDiv.id = '';
+                
+                isGenerating = false;
+                document.getElementById('sendBtn').disabled = false;
+                scrollToBottom();
+            }
+        }
+        
+        async function generateWebsiteResponse(prompt) {
+            isGenerating = true;
+            document.getElementById('sendBtn').disabled = true;
+            
+            // Create loading message
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message assistant';
+            loadingDiv.innerHTML = '<div style="color: #a0a0a0;">🌐 Generating website...</div>';
+            loadingDiv.id = 'currentAssistantMessage';
+            document.getElementById('chatContainer').appendChild(loadingDiv);
+            scrollToBottom();
+            
+            try {
+                // Create website generation prompt
+                const websitePrompt = `You are a web developer. Generate complete, functional HTML code for the following request: ${prompt}
+
+Requirements:
+- Create a complete HTML document with CSS and JavaScript inline
+- Make it responsive and visually appealing
+- Use modern design with good color schemes
+- Include interactive elements where appropriate
+- Ensure all functionality works without external dependencies
+- Use semantic HTML5 tags
+- Add smooth transitions and hover effects
+
+Generate only the HTML code (no explanations):`;
+                
+                const response = await fetch('/api/chat/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: [{ role: 'user', content: websitePrompt }],
+                        max_tokens: parseInt(document.getElementById('maxTokens').value),
+                        temperature: 0.3, // Lower temperature for code generation
+                        top_p: 0.9
+                    })
+                });
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let htmlCode = '';
+                let buffer = '';
+                
+                // Update loading message to show streaming
+                loadingDiv.innerHTML = '<div style="color: #a0a0a0;">🌐 Generating website...</div><div id="htmlPreview"></div>';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') {
+                                break;
+                            } else if (data.startsWith('[ERROR]')) {
+                                loadingDiv.innerHTML = '<div style="color: #e94560;">Error: ' + data.slice(7) + '</div>';
+                                resetModelContext();
+                                break;
+                            } else {
+                                htmlCode += data;
+                            }
+                        }
+                    }
+                }
+                
+                // Final preview update (only once after streaming completes)
+                updateHtmlPreview(htmlCode);
+                
+            } catch (err) {
+                loadingDiv.innerHTML = '<div style="color: #e94560;">Error: ' + err.message + '</div>';
+            } finally {
+                // Remove the ID since streaming is done
+                loadingDiv.id = '';
+                
+                isGenerating = false;
+                document.getElementById('sendBtn').disabled = false;
+                scrollToBottom();
+            }
+        }
+        
+        function updateHtmlPreview(htmlCode) {
+            const previewDiv = document.getElementById('htmlPreview');
+            if (previewDiv && htmlCode.trim()) {
+                // Extract only HTML code (remove any extra text and various prefixes)
+                let cleanHtml = htmlCode;
+                
+                // Handle different codeblock formats and prefixes
+                const patterns = [
+                    /```html\s*([\s\S]*?)\s*```/i,  // ```html ... ```
+                    /```\s*([\s\S]*?)\s*```/i,      // ``` ... ```
+                    /<html[\s\S]*<\/html>/i,          // Direct HTML tags
+                    /<!DOCTYPE html[\s\S]*<\/html>/i   // Full HTML document
+                ];
+                
+                // Try to extract HTML from various formats
+                for (const pattern of patterns) {
+                    const match = htmlCode.match(pattern);
+                    if (match) {
+                        cleanHtml = match[1] || match[0];
+                        break;
+                    }
+                }
+                
+                // Remove common prefixes if still present
+                cleanHtml = cleanHtml.replace(/^.*?Here's the complete HTML code for[^`]*?```html\s*/i, '');
+                cleanHtml = cleanHtml.replace(/^.*?Here is[^`]*?```html\s*/i, '');
+                cleanHtml = cleanHtml.replace(/^.*?Complete HTML code[^`]*?```html\s*/i, '');
+                
+                // Final cleanup - remove any remaining text before HTML
+                const htmlStartMatch = cleanHtml.match(/<!DOCTYPE|<html/i);
+                if (htmlStartMatch) {
+                    cleanHtml = cleanHtml.substring(htmlStartMatch.index);
+                }
+                
+                // Properly escape HTML for iframe srcdoc
+                const escapedHtml = cleanHtml
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+                
+                // Create a preview iframe with fullscreen option
+                previewDiv.innerHTML = `
+                    <div style="margin-top: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <div style="color: #000; font-size: 0.8em; font-weight: 600;">🌐 Website Preview:</div>
+                            <button onclick="openFullscreenPreview()" 
+                                    style="background: #000; color: white; border: 2px solid #000; padding: 4px 8px; border-radius: 6px; font-size: 0.7em; cursor:pointer;">
+                                ⛶ Fullscreen
+                            </button>
+                        </div>
+                        <iframe id="previewIframe" style="width: 100%; height: 400px; border: 3px solid #000; background: white;" 
+                                srcdoc="${escapedHtml}"></iframe>
+                        <details style="margin-top: 10px;">
+                            <summary style="color: #000; cursor: pointer; font-size: 0.8em; font-weight: 600; padding: 10px; background: #f5f5f5; border: 2px solid #000;">📝 View HTML Code</summary>
+                            <pre style="background: #f5f5f5; padding: 15px; border: 2px solid #000; border-top: none; margin: 0; font-size: 0.7em; overflow-x: auto; white-space: pre-wrap; color: #000;"><code>${cleanHtml}</code></pre>
+                        </details>
+                    </div>
+                `;
+            }
+        }
+        
+        function openFullscreenPreview() {
+            const iframe = document.getElementById('previewIframe');
+            if (iframe) {
+                const htmlContent = iframe.getAttribute('srcdoc');
+                const newWindow = window.open();
+                newWindow.document.write(htmlContent);
+                newWindow.document.close();
+            }
+        }
+        
+        function addMessage(role, content) {
+            const container = document.getElementById('chatContainer');
+            const div = document.createElement('div');
+            div.className = 'message ' + role;
+            div.textContent = content;
+            container.appendChild(div);
+            scrollToBottom();
+        }
+        
+        function scrollToBottom() {
+            const container = document.getElementById('chatContainer');
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+        
+        // Check model status on load
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/models/status');
+                const data = await response.json();
+                if (data.loaded) {
+                    showStatus('Model already loaded', 'loaded');
+                    document.getElementById('statusText').textContent = `Loaded: ${data.model_path.split('/').pop()}`;
+                    document.getElementById('sendBtn').disabled = false;
+                }
+            } catch (e) {}
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            checkStatus();
+            loadDownloadPath();
+        });
+    </script>
+</body>
+</html>
